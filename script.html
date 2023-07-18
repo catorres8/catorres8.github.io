@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Script para procesar archivo Excel</title>
+</head>
+
+<body>
+    <input type="file" id="excelFileInput" accept=".xlsx">
+    <button onclick="processExcelFile()">Procesar archivo</button>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script>
+        function calculateCoefficientOfVariation(values) {
+            const mean = values.reduce((acc, val) => acc + val, 0) / values.length;
+            const variance = values.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / (values.length - 1);
+            const standardDeviation = Math.sqrt(variance);
+            console.log((standardDeviation / mean) * 100);
+        }
+
+        function processExcelFile() {
+            const inputElement = document.getElementById('excelFileInput');
+            const file = inputElement.files[0];
+
+            if (file) {
+                const fileReader = new FileReader();
+
+                fileReader.onload = function (e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+
+                    const worksheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[worksheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                    const filteredRows = [];
+                    const codesToProcess = new Set();
+
+                    for (let i = 1; i < rows.length; i++) {
+                        const code = rows[i][0];
+                        if (!codesToProcess.has(code)) {
+                            codesToProcess.add(code);
+                        }
+                    }
+
+                    for (const code of codesToProcess) {
+                        const codeRows = rows.filter((row) => row[0] === code);
+                        const unitCosts = codeRows.map((row) => row[6]);
+                        const coefficientOfVariation = calculateCoefficientOfVariation(unitCosts);
+
+                        if (coefficientOfVariation >= 30) {
+                            for (const row of codeRows) {
+                                filteredRows.push(row);
+                            }
+                        }
+                    }
+
+                    filteredRows.unshift(rows[0]); // Add header row to the filtered rows
+
+                    const newWorkbook = XLSX.utils.book_new();
+                    const newWorksheet = XLSX.utils.aoa_to_sheet(filteredRows);
+                    XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Filtered Data');
+
+                    XLSX.writeFile(newWorkbook, 'filtered_data.xlsx');
+                };
+
+                fileReader.readAsArrayBuffer(file);
+            }
+        }
+    </script>
+</body>
+
+</html>
